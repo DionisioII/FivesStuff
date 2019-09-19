@@ -31,7 +31,7 @@ with  open (sensor_csv,'r') as inp:
         if row[2] == "PREV_BELT_ID":
 
             system = row[3]
-            phtNum = row[5]
+            phtNum = int(row[5])
             belt = row[7]
             
             if system != "0" and phtNum != 0:
@@ -51,7 +51,8 @@ print(Swp)
 ###### PARSE SWP TO GET LIST OF BELTS #############
 wb = xw.Book(Swp)
 
-upstream_systems_tabs = {1:"UP07_BELT",2:"UP06_BELT"} # name of the swp tab for each system
+upstream_systems_tabs = {1:"UP01_BELT",2:"UP11_BELT"} # name of the swp tab for each system
+upstream_sysToFrom = {1:"+IC004.GF001", 2:""}
 
 for system in upstream_systems_tabs.keys():
 
@@ -78,14 +79,15 @@ print(BELTs)
             
 with  open (input_csv,'r') as inp:
     reader = csv.reader(inp,delimiter=";", dialect="excel")
+    
     for row in reader:
         if row[1][0:3] == "PHT" and row[1][-1] == "5":
-            _,system,phtNum,_ = row.split("_")
+            _,system,phtNum,_ = row[1].split("_")
            
             
             if system not in barriers.keys():
                 barriers[system] = []
-            barriers[system].append(phtNum)
+            barriers[system].append(int(phtNum))
 inp.close()
 #print(barriers)
 ###### END OF PARSE INPUT CSV TO GET BARRIERS ########
@@ -105,7 +107,7 @@ i = 3
 for system in sorted(PHTs.keys()):
         for key in sorted(PHTs[system].keys() ):
             GroupId = 1
-            machine_num = 2
+            machine_num = 1
             SenderMsgIDint = 6
             SenderMsgWhoIDint = 10000+(GroupId*1000) + (int(system) *100)
 
@@ -115,36 +117,59 @@ for system in sorted(PHTs.keys()):
             out_sheet.range('D'+str(i)+':D'+str(i)).value = key
             belt_num =int(PHTs[system][key])
             
-            pht = BELTs[int(system)][belt_num]
-            if pht not in phts_belt_counter.keys():
-                phts_belt_counter[pht] = 1
-            else:
-                phts_belt_counter[pht] += 1
+           try:
+                pht = BELTs[int(system)][belt_num]
+                if pht not in phts_belt_counter.keys():
+                    phts_belt_counter[pht] = 1
+                else:
+                    phts_belt_counter[pht] += 1
+                electrical_name = pht + "-B" + str(phts_belt_counter[pht])
+                try:
+                    if key in barriers[system]:
+                        electrical_name += "R"
+                except:
+                    print("system" + system + " has no barriers")
+                out_sheet.range('E'+str(i)+':E'+str(i)).value = electrical_name
+            except KeyError:
+                print("Key error on pht " + pht)
 
-            out_sheet.range('E'+str(i)+':E'+str(i)).value = pht + "-B" + str(phts_belt_counter[pht])
             i+=1
 
 i = 3
 out_wb.sheets.add('belt')
 out_sheet= out_wb.sheets['belt']
-for system in BELTs:
+
+out_sheet.range('A2:A2').value = "MachineNum int"
+out_sheet.range('B2:B2').value = "SenderMsgIDint"
+out_sheet.range('C2:C2').value = "SenderMsgWhoIDint"
+out_sheet.range('D2:D2').value = "WhereID int"
+out_sheet.range('E2:E2').value = "LocationWhere 50 chars"
+out_sheet.range('F2:F2').value = "SysToFrom 50 chars"
+
+
+for system in sorted(BELTs.keys()):
         for key in sorted(BELTs[system].keys() ):
             GroupId = 1
             machine_num = 2
             SenderMsgIDint = 6
             SenderMsgWhoIDint = 10000+(GroupId*1000) + (int(system) *100)
 
+            out_sheet.range('A'+str(i)+':A'+str(i)).value = machine_num
             out_sheet.range('B'+str(i)+':B'+str(i)).value = SenderMsgIDint
             out_sheet.range('C'+str(i)+':C'+str(i)).value = SenderMsgWhoIDint
             out_sheet.range('D'+str(i)+':D'+str(i)).value = key
-            BeltName = BELTs[system][key] 
+            BeltName = BELTs[system][key]
+            """ 
             if "RB" in BeltName:
                 BeltName = BeltName + "-M1"
             elif BeltName[-2:] == "-2":
                 BeltName = BeltName + "-T2-H2"
             else:
                 BeltName = BeltName + "-T1-H2"
+                """
             out_sheet.range('E'+str(i)+':E'+str(i)).value = BeltName
+            out_sheet.range('F'+str(i)+':F'+str(i)).value = upstream_sysToFrom[system]
+
             i+=1
 
 
